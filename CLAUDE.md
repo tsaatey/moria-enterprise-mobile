@@ -62,3 +62,7 @@ Expo SDK 57, React Native, TypeScript, Expo Router. Routes are in `src/app/`; no
 - POS: the "Premium" badge is not shown, because the API has no field for it.
 - Process Payment: order lines get +/− quantity steppers and wholesale pricing with a hint under the line. A credit sale takes an optional deposit (cash or MoMo), which the API accepts as a payment no larger than the total. The customer section adds search and an inline "New Customer" form (the prototype's Add Customer fields), because the spec asks for customer capture at checkout. Picking an existing customer for credit fills in a missing name and address.
 - Customers & Debts: added search and an **Overdue** chip beside All/Debtors. **Take Payment** is per credit sale: when a customer has more than one open sale, the sheet asks which one, overdue and oldest first, and "Full" settles that sale. The API takes an instalment against one sale and refuses over-payment. Cards for customers without a name and address offer "Add name & address for credit", which works offline and fills blanks only. "Last purchase" is shown only when this device knows of a sale. A "Needs attention" panel lists records the server refused, with **Complete** (for `CUSTOMER_INCOMPLETE`) or **Retry**. The hero card shows when the balances were last fetched.
+
+## Branch workflow
+
+Never commit directly on `development` or `main`. Branch from `main`, PR onto `development`, and release with a PR from `development` onto `main`. See `.claude/rules/branch-workflow.md`.
