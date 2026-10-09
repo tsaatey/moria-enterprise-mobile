@@ -185,6 +185,28 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX debtsCache_customer ON debtsCache (customerId);
   `,
+
+  // 4 — shopInventory keeps only what the sync pull sends: the raw row.
+  // Effective prices are resolved at read time from the overrides and the
+  // product (src/db/catalog.ts, mirroring the backend's utils/pricing.js), so
+  // a repriced product is right at once — the pull resends only the product,
+  // not every shop's stock row.
+  `
+  CREATE TABLE shopInventory_v4 (
+    shopId                 TEXT NOT NULL,
+    productId              TEXT NOT NULL,
+    quantity               INTEGER NOT NULL DEFAULT 0,
+    reorderLevel           INTEGER NOT NULL DEFAULT 0,
+    priceOverride          TEXT,
+    wholesalePriceOverride TEXT,
+    updatedAt              TEXT,
+    PRIMARY KEY (shopId, productId)
+  );
+  INSERT INTO shopInventory_v4 (shopId, productId, quantity, reorderLevel, priceOverride, wholesalePriceOverride, updatedAt)
+    SELECT shopId, productId, quantity, reorderLevel, priceOverride, wholesalePriceOverride, updatedAt FROM shopInventory;
+  DROP TABLE shopInventory;
+  ALTER TABLE shopInventory_v4 RENAME TO shopInventory;
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {

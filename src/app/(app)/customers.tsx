@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { useSession } from '@/auth/session-store';
 import { CompleteProfileForm } from '@/components/customers/complete-profile-form';
@@ -10,6 +10,7 @@ import { CustomerForm } from '@/components/customers/customer-form';
 import { RecordPaymentSheet } from '@/components/customers/record-payment-sheet';
 import { SyncIssuesPanel } from '@/components/customers/sync-issues-panel';
 import { Chip } from '@/components/ui/chip';
+import { usePullToSync } from '@/components/ui/pull-to-sync';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { SuccessModal } from '@/components/ui/success-modal';
@@ -36,7 +37,7 @@ type Filter = 'all' | 'debtors' | 'overdue';
 export default function CustomersScreen() {
   const db = useSQLiteContext();
   const user = useSession((s) => s.user)!;
-  const { dataVersion, phase, requestSync } = useSyncStore();
+  const { dataVersion, requestSync } = useSyncStore();
 
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
@@ -51,6 +52,7 @@ export default function CustomersScreen() {
   const [completing, setCompleting] = useState<{ customer: LocalCustomer; issue?: SyncIssue } | null>(null);
   const [success, setSuccess] = useState<{ title: string; message: string } | null>(null);
 
+  const pullToSync = usePullToSync();
   const reload = useCallback(() => setTick((t) => t + 1), []);
   useFocusEffect(reload);
 
@@ -133,12 +135,15 @@ export default function CustomersScreen() {
         <Text style={styles.heroLabel} color="rgba(243,232,245,0.7)">
           TOTAL OUTSTANDING
         </Text>
-        <Text style={styles.heroValue} color={colors.white}>
+        {/* Two sibling Texts: Android clips a nested Text set in a different font. */}
+        <View style={styles.heroValueRow}>
           <Text style={styles.heroCurrency} color={colors.monarchGold}>
-            GHS{' '}
+            GHS
           </Text>
-          {formatGhs(totalDebt)}
-        </Text>
+          <Text style={styles.heroValue} color={colors.white}>
+            {formatGhs(totalDebt)}
+          </Text>
+        </View>
         <View style={styles.heroStats}>
           <View style={styles.heroStat}>
             <Text style={styles.heroStatLabel} color="rgba(243,232,245,0.7)">
@@ -203,6 +208,7 @@ export default function CustomersScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}
         ListHeaderComponent={header}
         keyboardShouldPersistTaps="handled"
+        refreshControl={pullToSync}
         renderItem={({ item }) => (
           <CustomerCard
             customer={item}
@@ -216,7 +222,6 @@ export default function CustomersScreen() {
             {search ? 'No customers match your search' : filter === 'all' ? 'No customers yet' : 'Nobody owes anything'}
           </Text>
         }
-        refreshControl={<RefreshControl refreshing={phase === 'syncing'} onRefresh={() => requestSync?.()} tintColor={colors.regalPlum} />}
       />
 
       <Sheet open={adding} onClose={() => setAdding(false)} title="Add Customer" height="80%">
@@ -268,7 +273,8 @@ const styles = StyleSheet.create({
   h2: { fontFamily: fonts.display, fontSize: 24, lineHeight: 32 },
   hero: { backgroundColor: colors.regalPlum, borderRadius: radius.xl, padding: 20, overflow: 'hidden' },
   heroLabel: { fontFamily: fonts.sansSemi, fontSize: 10, letterSpacing: 2, marginBottom: 4 },
-  heroValue: { fontFamily: fonts.display, fontSize: 30, lineHeight: 38 },
+  heroValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  heroValue: { fontFamily: fonts.display, fontSize: 30, lineHeight: 40, paddingTop: 2 },
   heroCurrency: { fontFamily: fonts.sans, fontSize: 16 },
   heroStats: { flexDirection: 'row', gap: 12, marginTop: 16 },
   heroStat: { flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: radius.lg, padding: 12 },

@@ -33,7 +33,7 @@ it('pushes before pulling, stores the server cursor, and sends it next time', as
     saleType: 'fullPayment',
     customerId: null,
     dueDate: null,
-    lines: [{ productId: 'p', quantity: 1, unitPrice: '10.00', subtotal: '10.00', priceTier: 'retail', retailPrice: '10.00' }],
+    lines: [{ productId: 'p', quantity: 1, unitPrice: '10.00', subtotal: '10.00', priceTier: 'retail' }],
     payment: { amount: '10.00', method: 'cash', momoReference: null },
   });
   expect((await countPending(db, USER)).mine).toBe(1);
