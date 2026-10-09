@@ -117,6 +117,16 @@ export type PaymentMethod = 'cash' | 'momo';
 export type PriceTier = 'retail' | 'wholesale';
 export type MovementType = 'restock' | 'sale' | 'return' | 'adjustment';
 
+export interface SaleItem {
+  id: string;
+  productId: string;
+  product?: { id: string; name: string; coverImageUrl: string | null } | null;
+  quantity: number;
+  unitPrice: Money;
+  subtotal: Money;
+  priceTier: PriceTier;
+}
+
 export interface SaleSummary {
   id: string;
   shopId: string;
@@ -131,6 +141,8 @@ export interface SaleSummary {
   note: string | null;
   deviceRecordedAt: string;
   updatedAt: string;
+  shop?: { id: string; name: string } | null;
+  customer?: { id: string; phone: string; name: string | null } | null;
 }
 
 export interface Payment {
