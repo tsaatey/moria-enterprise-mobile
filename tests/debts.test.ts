@@ -64,7 +64,7 @@ it('includes an unsynced credit sale, net of its deposit, ordered overdue first'
     saleType: 'credit',
     customerId: CUST,
     dueDate: '2000-06-01',
-    lines: [{ productId: 'p', quantity: 1, unitPrice: '450.00', subtotal: '450.00', priceTier: 'retail', retailPrice: '450.00' }],
+    lines: [{ productId: 'p', quantity: 1, unitPrice: '450.00', subtotal: '450.00', priceTier: 'retail' }],
     payment: { amount: '100.00', method: 'cash', momoReference: null },
   });
 
@@ -88,7 +88,7 @@ it('lists a rejected credit sale and requeues it with its customer and deposit',
     saleType: 'credit',
     customerId: CUST,
     dueDate: '2099-01-01',
-    lines: [{ productId: 'p', quantity: 1, unitPrice: '450.00', subtotal: '450.00', priceTier: 'retail', retailPrice: '450.00' }],
+    lines: [{ productId: 'p', quantity: 1, unitPrice: '450.00', subtotal: '450.00', priceTier: 'retail' }],
     payment: { amount: '100.00', method: 'cash', momoReference: null },
   });
   await db.runAsync(`UPDATE sales SET syncStatus = 'rejected', syncErrorCode = 'CUSTOMER_INCOMPLETE', syncErrorMessage = 'needs name' WHERE id = ?`, id);

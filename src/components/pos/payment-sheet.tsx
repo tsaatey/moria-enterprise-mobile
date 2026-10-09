@@ -96,7 +96,6 @@ export function PaymentSheet({
           unitPrice: l.unitPrice,
           subtotal: l.subtotal,
           priceTier: l.priceTier,
-          retailPrice: l.product.retailPrice,
         })),
         payment,
       });

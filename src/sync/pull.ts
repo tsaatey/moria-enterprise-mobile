@@ -53,25 +53,20 @@ export async function applyChanges(db: SQLiteDatabase, { changes }: ChangesRespo
       );
     }
 
+    // Raw rows: the pull sends overrides, not resolved prices (see schema v4).
     for (const i of changes.shopInventory) {
       await txn.runAsync(
-        `INSERT INTO shopInventory (shopId, productId, quantity, reorderLevel, priceOverride, effectivePrice,
-           wholesalePriceOverride, effectiveWholesalePrice, wholesaleMinQuantity, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO shopInventory (shopId, productId, quantity, reorderLevel, priceOverride, wholesalePriceOverride, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (shopId, productId) DO UPDATE SET quantity = excluded.quantity,
            reorderLevel = excluded.reorderLevel, priceOverride = excluded.priceOverride,
-           effectivePrice = excluded.effectivePrice, wholesalePriceOverride = excluded.wholesalePriceOverride,
-           effectiveWholesalePrice = excluded.effectiveWholesalePrice,
-           wholesaleMinQuantity = excluded.wholesaleMinQuantity, updatedAt = excluded.updatedAt`,
+           wholesalePriceOverride = excluded.wholesalePriceOverride, updatedAt = excluded.updatedAt`,
         i.shopId,
         i.productId,
         i.quantity,
         i.reorderLevel,
-        i.priceOverride,
-        i.effectivePrice,
-        i.wholesalePriceOverride,
-        i.effectiveWholesalePrice,
-        i.wholesaleMinQuantity,
+        i.priceOverride ?? null,
+        i.wholesalePriceOverride ?? null,
         i.updatedAt,
       );
     }

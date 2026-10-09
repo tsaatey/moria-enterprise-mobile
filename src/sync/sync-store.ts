@@ -47,15 +47,24 @@ export const useSyncStore = create<SyncState>()((set) => ({
       }));
     } catch (e) {
       if (e instanceof NetworkError) set({ phase: 'offline' });
-      else set({ phase: 'error', lastError: e instanceof ApiError ? e.message : String(e) });
+      else {
+        const message = e instanceof ApiError ? `${e.code}: ${e.message}` : e instanceof Error ? e.message : String(e);
+        if (__DEV__) console.warn('[sync] failed:', message, e);
+        set({ phase: 'error', lastError: message });
+      }
     } finally {
-      const { mine, others } = await countPending(ctx.db, ctx.userId);
-      set({ pending: mine, othersPending: others });
+      await useSyncStore.getState().refreshPending(ctx);
     }
   },
 
   async refreshPending({ db, userId }) {
-    const { mine, others } = await countPending(db, userId);
-    set({ pending: mine, othersPending: others });
+    // Callers fire and forget (`void sync(...)`), so this must never reject:
+    // the database can be closed under it (a dev reload remounting the provider).
+    try {
+      const { mine, others } = await countPending(db, userId);
+      set({ pending: mine, othersPending: others });
+    } catch (e) {
+      if (__DEV__) console.warn('[sync] could not count pending records:', e);
+    }
   },
 }));

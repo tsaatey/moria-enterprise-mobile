@@ -11,8 +11,6 @@ export interface NewSaleLine {
   unitPrice: Money;
   subtotal: Money;
   priceTier: PriceTier;
-  /** For a shop with no stock row yet: the price that row would start at. */
-  retailPrice: Money;
 }
 
 export interface NewSale {
@@ -70,13 +68,12 @@ export async function recordSale(db: SQLiteDatabase, sale: NewSale): Promise<{ i
       );
       // Mirrors the server: a sale in a shop with no stock row creates one.
       await txn.runAsync(
-        `INSERT INTO shopInventory (shopId, productId, quantity, reorderLevel, effectivePrice, updatedAt)
-         VALUES (?, ?, ?, 0, ?, ?)
+        `INSERT INTO shopInventory (shopId, productId, quantity, reorderLevel, updatedAt)
+         VALUES (?, ?, ?, 0, ?)
          ON CONFLICT (shopId, productId) DO UPDATE SET quantity = shopInventory.quantity + excluded.quantity`,
         sale.shopId,
         line.productId,
         -line.quantity,
-        line.retailPrice,
         at,
       );
     }

@@ -18,8 +18,18 @@ export default function PinUnlockScreen() {
     setPin(next);
     if (next.length < PIN_LENGTH) return;
     setBusy(true);
-    const { ok, attemptsLeft } = await unlock(next);
+    let result: { ok: boolean; attemptsLeft: number };
+    try {
+      result = await unlock(next);
+    } catch {
+      // A fault in hashing is not a wrong PIN: don't count it, just let them retry.
+      setBusy(false);
+      setPin('');
+      setMessage('!Could not check the PIN · try again');
+      return;
+    }
     setBusy(false);
+    const { ok, attemptsLeft } = result;
     if (!ok) {
       setPin('');
       setMessage(`!Incorrect PIN · ${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left`);

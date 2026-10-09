@@ -76,6 +76,11 @@ export interface Product {
   deletedAt?: string | null;
 }
 
+/**
+ * A shop's stock row as `GET /sync/changes` sends it: the raw table row.
+ * The device resolves prices itself (src/db/catalog.ts). The resolved fields
+ * appear on the inventory endpoints and are optional here.
+ */
 export interface InventoryRow {
   shopId: string;
   productId: string;
@@ -83,13 +88,13 @@ export interface InventoryRow {
   quantity: number;
   reorderLevel: number;
   priceOverride: Money | null;
-  effectivePrice: Money;
   wholesalePriceOverride: Money | null;
-  effectiveWholesalePrice: Money | null;
-  wholesaleMinQuantity: number | null;
-  lowStock: boolean;
-  oversold: boolean;
   updatedAt: string;
+  effectivePrice?: Money;
+  effectiveWholesalePrice?: Money | null;
+  wholesaleMinQuantity?: number | null;
+  lowStock?: boolean;
+  oversold?: boolean;
 }
 
 export interface Customer {
