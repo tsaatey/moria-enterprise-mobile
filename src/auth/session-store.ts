@@ -50,6 +50,13 @@ export const useSession = create<SessionState>()((set, get) => ({
   accessToken: null,
 
   async bootstrap() {
+    // Launch only. RootLayout can remount (fast refresh, navigator changes);
+    // re-reading storage then would see a session mid-setup — refresh token,
+    // no PIN yet — and wipe it as abandoned.
+    if (get().status !== 'booting') {
+      if (!get().deviceId) set({ deviceId: await getDeviceId() });
+      return;
+    }
     const [deviceId, refreshToken, user, pinHash] = await Promise.all([
       getDeviceId(),
       secureStorage.getRefreshToken(),

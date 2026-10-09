@@ -98,3 +98,55 @@ export async function completeCustomer(
   );
   return db.getFirstAsync<LocalCustomer>('SELECT id, phone, name, address, smsOptIn, syncStatus FROM customers WHERE id = ?', id);
 }
+
+export interface CustomerListRow extends LocalCustomer {
+  /** Latest sale this device knows of for the customer. */
+  lastPurchaseAt: string | null;
+}
+
+/** The Customers screen list: search by name or phone, phone-only customers included. */
+export function listCustomers(db: SQLiteDatabase, { search, limit = 200 }: { search?: string; limit?: number }) {
+  const where = ['c.deletedAt IS NULL'];
+  const params: (string | number)[] = [];
+  const q = search?.trim();
+  if (q) {
+    where.push(`(c.name LIKE ? ESCAPE '\\' OR c.phone LIKE ? ESCAPE '\\')`);
+    const esc = (v: string) => `%${v.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+    params.push(esc(q), esc(normalizePhoneIfPossible(q)));
+  }
+  params.push(limit);
+  return db.getAllAsync<CustomerListRow>(
+    `SELECT c.id, c.phone, c.name, c.address, c.smsOptIn, c.syncStatus,
+            (SELECT MAX(s.deviceRecordedAt) FROM sales s WHERE s.customerId = c.id AND s.status = 'completed') AS lastPurchaseAt
+     FROM customers c WHERE ${where.join(' AND ')}
+     ORDER BY c.name IS NULL, c.name COLLATE NOCASE, c.phone LIMIT ?`,
+    ...params,
+  );
+}
+
+export function getCustomer(db: SQLiteDatabase, id: string): Promise<LocalCustomer | null> {
+  return db.getFirstAsync<LocalCustomer>('SELECT id, phone, name, address, smsOptIn, syncStatus FROM customers WHERE id = ?', id);
+}
+
+/** Customers by id, for the Debtors / Overdue filters (which start from the debt list). */
+export async function listCustomersByIds(db: SQLiteDatabase, ids: string[], search?: string): Promise<CustomerListRow[]> {
+  const out: CustomerListRow[] = [];
+  const q = search?.trim();
+  const qPhone = q ? normalizePhoneIfPossible(q) : '';
+  // SQLite caps bound parameters; chunk to stay well under it.
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const rows = await db.getAllAsync<CustomerListRow>(
+      `SELECT c.id, c.phone, c.name, c.address, c.smsOptIn, c.syncStatus,
+              (SELECT MAX(s.deviceRecordedAt) FROM sales s WHERE s.customerId = c.id AND s.status = 'completed') AS lastPurchaseAt
+       FROM customers c WHERE c.deletedAt IS NULL AND c.id IN (${chunk.map(() => '?').join(',')})`,
+      ...chunk,
+    );
+    out.push(
+      ...rows.filter(
+        (r) => !q || r.name?.toLowerCase().includes(q.toLowerCase()) || r.phone.includes(qPhone) || r.phone.includes(q),
+      ),
+    );
+  }
+  return out;
+}

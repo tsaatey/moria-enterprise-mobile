@@ -165,6 +165,26 @@ const MIGRATIONS: string[] = [
     isActive   INTEGER NOT NULL DEFAULT 1
   );
   `,
+
+  // 3 — the server's open debts (GET /debts), cached for offline reading.
+  // The balance and overdue flag come from the `debts` view; the device only
+  // overlays its own unsynced sales and payments on top (src/db/debts.ts).
+  `
+  CREATE TABLE debtsCache (
+    saleId         TEXT PRIMARY KEY NOT NULL,
+    shopId         TEXT NOT NULL,
+    shopName       TEXT,
+    customerId     TEXT NOT NULL,
+    totalAmount    TEXT NOT NULL,
+    amountPaid     TEXT NOT NULL,
+    amountReturned TEXT NOT NULL,
+    balance        TEXT NOT NULL,
+    dueDate        TEXT NOT NULL,
+    lastPaymentAt  TEXT,
+    saleRecordedAt TEXT NOT NULL
+  );
+  CREATE INDEX debtsCache_customer ON debtsCache (customerId);
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
@@ -184,3 +204,4 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
 }
 
 export const DATABASE_NAME = 'moria.db';
+export const SCHEMA_VERSION = MIGRATIONS.length;

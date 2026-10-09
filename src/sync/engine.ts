@@ -2,7 +2,9 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import * as syncApi from '@/api/sync';
 import type { Role } from '@/api/types';
+import * as debtsApi from '@/api/debts';
 import * as shopsApi from '@/api/shops';
+import { saveDebts } from '@/db/debts';
 import { getMeta, setMeta } from '@/db/meta';
 import { saveShops } from '@/db/shops';
 import { nowIso } from '@/lib/dates';
@@ -63,6 +65,10 @@ async function doSync({ db, deviceId, userId, role }: SyncContext): Promise<Sync
   await applyChanges(db, delta);
   // Cursor is the server's clock, never the device's.
   await setMeta(db, 'syncCursor', delta.serverTime);
+
+  // Balances are derived server-side (the `debts` view), not carried by the
+  // pull; refresh the cache after the push so it includes this device's work.
+  await saveDebts(db, await debtsApi.listAllDebts());
   const pulledAt = nowIso();
   await setMeta(db, 'lastSyncedAt', pulledAt);
 

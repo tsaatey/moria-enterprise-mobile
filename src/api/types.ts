@@ -141,3 +141,22 @@ export interface Payment {
   deviceRecordedAt: string;
   updatedAt?: string;
 }
+
+/** A row of the server's `debts` view: one open credit sale. */
+export interface Debt {
+  saleId: string;
+  shopId: string;
+  shop?: { id: string; name: string } | null;
+  customerId: string;
+  customer?: { id: string; phone: string; name: string | null; address: string | null } | null;
+  totalAmount: Money;
+  amountPaid: Money;
+  amountReturned: Money;
+  /** Always > 0. */
+  balance: Money;
+  dueDate: string;
+  overdue: boolean;
+  lastPaymentAt: string | null;
+  saleRecordedAt: string;
+  note: string | null;
+}

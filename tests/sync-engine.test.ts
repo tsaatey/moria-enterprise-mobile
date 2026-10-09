@@ -1,3 +1,4 @@
+import * as debtsApi from '@/api/debts';
 import * as shopsApi from '@/api/shops';
 import * as syncApi from '@/api/sync';
 import { getMeta } from '@/db/meta';
@@ -9,6 +10,7 @@ import { memoryDb } from './helpers/memory-db';
 
 jest.mock('@/api/sync', () => ({ ...jest.requireActual('@/api/sync'), push: jest.fn(), changes: jest.fn() }));
 jest.mock('@/api/shops', () => ({ listShops: jest.fn() }));
+jest.mock('@/api/debts', () => ({ listAllDebts: jest.fn().mockResolvedValue([]) }));
 
 const push = syncApi.push as jest.Mock;
 const changes = syncApi.changes as jest.Mock;
@@ -18,6 +20,7 @@ const empty = { categories: [], products: [], shopInventory: [], customers: [] }
 
 beforeEach(() => {
   jest.resetAllMocks();
+  (debtsApi.listAllDebts as jest.Mock).mockResolvedValue([]);
   (shopsApi.listShops as jest.Mock).mockResolvedValue([{ id: SHOP, name: 'East Legon', location: null, momoNumber: null, isActive: true }]);
 });
 

@@ -8,7 +8,14 @@ import { colors } from '@/theme/tokens';
 export function AuthBackdrop({ children }: { children: ReactNode }) {
   return (
     <LinearGradient colors={[colors.regalPlumLight, colors.regalPlum]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1 }}>
-      <View style={styles.glow} pointerEvents="none" />
+      {/* The prototype's blur-[100px] gold glow; RN has no CSS blur, so fake it with fading rings. */}
+      {GLOW_RINGS.map((r) => (
+        <View
+          key={r}
+          pointerEvents="none"
+          style={[styles.glow, { width: r * 2, height: r * 2, borderRadius: r, top: 48 - r, left: 48 - r }]}
+        />
+      ))}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {children}
@@ -17,6 +24,9 @@ export function AuthBackdrop({ children }: { children: ReactNode }) {
     </LinearGradient>
   );
 }
+
+// Many thin, faint rings so the falloff reads as a blur rather than bands.
+const GLOW_RINGS = Array.from({ length: 24 }, (_, i) => 220 - i * 8);
 
 export const authCard = {
   backgroundColor: colors.white,
@@ -33,14 +43,5 @@ export const authCard = {
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 32 },
-  glow: {
-    position: 'absolute',
-    top: -96,
-    left: -96,
-    width: 288,
-    height: 288,
-    borderRadius: 144,
-    backgroundColor: colors.monarchGold,
-    opacity: 0.2,
-  },
+  glow: { position: 'absolute', backgroundColor: colors.monarchGold, opacity: 0.014 },
 });

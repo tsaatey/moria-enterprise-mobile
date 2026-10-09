@@ -3,7 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { listPosProducts } from '@/db/catalog';
 import { createCustomer } from '@/db/customers';
 import { recordSale } from '@/db/sales';
-import { migrateDbIfNeeded } from '@/db/schema';
+import { migrateDbIfNeeded, SCHEMA_VERSION } from '@/db/schema';
 import { applyChanges } from '@/sync/pull';
 import { applyPushResult, collectPending } from '@/sync/push';
 
@@ -73,7 +73,7 @@ describe('schema', () => {
     await migrateDbIfNeeded(db);
     await migrateDbIfNeeded(db);
     const v = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
-    expect(v?.user_version).toBe(2);
+    expect(v?.user_version).toBe(SCHEMA_VERSION);
   });
 });
 

@@ -213,6 +213,8 @@ export async function applyPushResult(db: SQLiteDatabase, batch: PushRequest, re
     // A pushed phone that already existed was merged onto the server's
     // customer: rewrite local references to the server id.
     for (const { localId, serverId } of result.customerRemaps) {
+      // The server only remaps when the ids differ; never delete the row we keep.
+      if (localId === serverId) continue;
       await txn.runAsync('UPDATE sales SET customerId = ? WHERE customerId = ?', serverId, localId);
       const existing = await txn.getFirstAsync<{ id: string }>('SELECT id FROM customers WHERE id = ?', serverId);
       if (existing) {
