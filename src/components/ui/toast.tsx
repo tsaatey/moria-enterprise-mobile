@@ -46,7 +46,7 @@ export function ToastHost({ bottom = 96, overlay = false }: { bottom?: number; o
   if (!message || (!overlay && overlays > 0)) return null;
   return (
     <Animated.View pointerEvents="none" style={[styles.toast, { bottom }, style]}>
-      <Animated.Text style={styles.text} numberOfLines={1}>
+      <Animated.Text style={styles.text} numberOfLines={3}>
         {message}
       </Animated.Text>
     </Animated.View>
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 999,
+    borderRadius: 20,
     backgroundColor: colors.regalPlum,
     zIndex: 60,
     maxWidth: '90%',

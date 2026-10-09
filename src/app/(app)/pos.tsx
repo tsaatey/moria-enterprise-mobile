@@ -1,13 +1,14 @@
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import type { Shop } from '@/api/types';
 import { useSession } from '@/auth/session-store';
 import { PaymentSheet } from '@/components/pos/payment-sheet';
 import { ProductCard } from '@/components/pos/product-card';
 import { Chip } from '@/components/ui/chip';
+import { usePullToSync } from '@/components/ui/pull-to-sync';
 import { Icon } from '@/components/ui/icon';
 import { SuccessModal } from '@/components/ui/success-modal';
 import { Text } from '@/components/ui/text';
@@ -32,7 +33,8 @@ const METHOD_LABEL = { cash: 'cash', momo: 'MoMo', credit: 'credit' } as const;
 export default function PosScreen() {
   const db = useSQLiteContext();
   const user = useSession((s) => s.user)!;
-  const { dataVersion, phase, requestSync } = useSyncStore();
+  const { dataVersion, requestSync } = useSyncStore();
+  const pullToSync = usePullToSync();
   const { shopId, lines, setShop, add, refreshProducts } = useCart();
 
   const [shops, setShops] = useState<Shop[]>([]);
@@ -151,9 +153,7 @@ export default function PosScreen() {
             {search || categoryId ? 'No products match your search' : 'No products yet — pull down to sync.'}
           </Text>
         }
-        refreshControl={
-          <RefreshControl refreshing={phase === 'syncing'} onRefresh={() => requestSync?.()} tintColor={colors.regalPlum} />
-        }
+        refreshControl={pullToSync}
       />
 
       {lines.length ? (

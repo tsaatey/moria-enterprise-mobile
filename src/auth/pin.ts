@@ -29,15 +29,29 @@ export async function hashPin(pin: string): Promise<string> {
   return `argon2id$t=${t},m=${m},p=${p}$${salt.toString('hex')}$${hash.toString('hex')}`;
 }
 
-export async function verifyPin(pin: string, stored: string): Promise<boolean> {
+/** Split a stored hash into its parameters, salt and digest; null when it isn't one of ours. */
+export function parsePinHash(stored: string) {
   const [alg, params, saltHex, hashHex] = stored.split('$');
-  if (alg !== 'argon2id' || !params || !saltHex || !hashHex) return false;
-  const opts = Object.fromEntries(params.split(',').map((kv) => kv.split('=').map(Number))) as Record<string, number>;
-  const expected = Buffer.from(hashHex, 'hex');
-  const actual = await derive(pin, Buffer.from(saltHex, 'hex'), {
-    passes: opts.t,
-    memory: opts.m,
-    parallelism: opts.p,
+  if (alg !== 'argon2id' || !params || !saltHex || !hashHex) return null;
+  const opts = Object.fromEntries(
+    params.split(',').map((kv) => {
+      const [key, value] = kv.split('=');
+      return [key, Number(value)];
+    }),
+  );
+  const { t, m, p } = opts;
+  if (![t, m, p].every((n) => Number.isInteger(n) && n > 0)) return null;
+  return { passes: t, memory: m, parallelism: p, saltHex, hashHex };
+}
+
+export async function verifyPin(pin: string, stored: string): Promise<boolean> {
+  const parsed = parsePinHash(stored);
+  if (!parsed) return false;
+  const expected = Buffer.from(parsed.hashHex, 'hex');
+  const actual = await derive(pin, Buffer.from(parsed.saltHex, 'hex'), {
+    passes: parsed.passes,
+    memory: parsed.memory,
+    parallelism: parsed.parallelism,
     tagLength: expected.length,
   });
   return actual.length === expected.length && QuickCrypto.timingSafeEqual(actual, expected);

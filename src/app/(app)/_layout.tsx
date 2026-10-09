@@ -6,7 +6,7 @@ import { Alert } from 'react-native';
 import { useSession } from '@/auth/session-store';
 import { AppHeader } from '@/components/app-header';
 import { SideDrawer } from '@/components/side-drawer';
-import { ToastHost } from '@/components/ui/toast';
+import { showToast, ToastHost } from '@/components/ui/toast';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { MAIN_TABS } from '@/navigation/nav-items';
 import { useSyncStore } from '@/sync/sync-store';
@@ -50,7 +50,18 @@ export default function AppLayout() {
     <>
       <Tabs
         screenOptions={{
-          header: () => <AppHeader onMenu={() => setDrawerOpen(true)} onSync={syncNow} />,
+          header: () => (
+            <AppHeader
+              onMenu={() => setDrawerOpen(true)}
+              onSync={() => {
+                // Say why the last attempt failed before trying again.
+                const { phase, lastError } = useSyncStore.getState();
+                if (phase === 'error' && lastError) showToast(`Last sync failed — ${lastError}`);
+                else if (phase === 'offline') showToast('Offline — will sync when connected');
+                syncNow();
+              }}
+            />
+          ),
           tabBarActiveTintColor: colors.regalPlum,
           tabBarInactiveTintColor: colors.onSurfaceVariant,
           tabBarLabelStyle: { fontFamily: fonts.sansSemi, fontSize: 10, letterSpacing: 0.3 },

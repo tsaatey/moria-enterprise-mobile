@@ -47,20 +47,9 @@ async function seededDb(): Promise<SQLiteDatabase> {
         },
       ],
       shopInventory: [
-        {
-          shopId: SHOP,
-          productId: WIG,
-          quantity: 2,
-          reorderLevel: 1,
-          priceOverride: '950.00',
-          effectivePrice: '950.00',
-          wholesalePriceOverride: null,
-          effectiveWholesalePrice: '800.00',
-          wholesaleMinQuantity: 3,
-          lowStock: false,
-          oversold: false,
-          updatedAt: T,
-        },
+        // The raw table row, exactly what GET /sync/changes sends — no
+        // resolved prices (the device used to require effectivePrice here).
+        { shopId: SHOP, productId: WIG, quantity: 2, reorderLevel: 1, priceOverride: '950.00', wholesalePriceOverride: null, updatedAt: T },
       ],
     }),
   );
@@ -78,10 +67,26 @@ describe('schema', () => {
 });
 
 describe('catalog read', () => {
+  it('reprices from the product row alone, with no stock row resent', async () => {
+    const db = await seededDb();
+    await db.runAsync("UPDATE shopInventory SET priceOverride = NULL");
+    await db.runAsync("UPDATE products SET defaultPrice = '1000.00'");
+    const [p] = await listPosProducts(db, SHOP);
+    expect(p.retailPrice).toBe('1000.00');
+  });
+
+  it('has no wholesale price when the product has no wholesale minimum', async () => {
+    const db = await seededDb();
+    await db.runAsync("UPDATE shopInventory SET wholesalePriceOverride = '500.00'");
+    await db.runAsync('UPDATE products SET wholesalePrice = NULL, wholesaleMinQuantity = NULL');
+    const [p] = await listPosProducts(db, SHOP);
+    expect(p).toMatchObject({ wholesalePrice: null, wholesaleMinQuantity: null });
+  });
+
   it("prices from the shop's inventory row and searches by barcode", async () => {
     const db = await seededDb();
     const [p] = await listPosProducts(db, SHOP, { search: 'gwu' });
-    expect(p).toMatchObject({ id: WIG, retailPrice: '950.00', wholesalePrice: '800.00', wholesaleMinQuantity: 3, quantity: 2 });
+    expect(p).toMatchObject({ id: WIG, wholesalePrice: '800.00', wholesaleMinQuantity: 3, quantity: 2 });
   });
 
   it('falls back to catalog prices in a shop with no stock row', async () => {
@@ -113,7 +118,7 @@ describe('recording a sale and pushing it', () => {
       saleType: 'credit',
       customerId: customer.id,
       dueDate: '2026-11-08',
-      lines: [{ productId: WIG, quantity: 3, unitPrice: '800.00', subtotal: '2400.00', priceTier: 'wholesale', retailPrice: '950.00' }],
+      lines: [{ productId: WIG, quantity: 3, unitPrice: '800.00', subtotal: '2400.00', priceTier: 'wholesale' }],
       payment: { amount: '500.00', method: 'cash', momoReference: 'ignored-for-cash' },
     });
 
@@ -143,7 +148,7 @@ describe('recording a sale and pushing it', () => {
     const db = await seededDb();
     const amasCustomer = await createCustomer(db, { phone: '0201112222', name: 'Efua', address: 'Tema', smsOptIn: true, createdBy: AMA });
     await createCustomer(db, { phone: '0203334444', name: null, address: null, smsOptIn: true, createdBy: AMA });
-    const line = { productId: WIG, quantity: 1, unitPrice: '950.00', subtotal: '950.00', priceTier: 'retail' as const, retailPrice: '950.00' };
+    const line = { productId: WIG, quantity: 1, unitPrice: '950.00', subtotal: '950.00', priceTier: 'retail' as const };
     await recordSale(db, { shopId: SHOP, userId: AMA, saleType: 'fullPayment', customerId: null, dueDate: null, lines: [line], payment: { amount: '950.00', method: 'momo', momoReference: 'MP1' } });
     await recordSale(db, { shopId: SHOP, userId: YAW, saleType: 'fullPayment', customerId: amasCustomer.id, dueDate: null, lines: [line], payment: { amount: '950.00', method: 'cash', momoReference: null } });
 
@@ -161,7 +166,7 @@ describe('recording a sale and pushing it', () => {
   it('marks accepted rows synced, keeps rejected ones with their code, and applies customer remaps', async () => {
     const db = await seededDb();
     const local = await createCustomer(db, { phone: '0244000000', name: 'Ama', address: 'Lapaz', smsOptIn: true, createdBy: AMA });
-    const line = { productId: WIG, quantity: 1, unitPrice: '950.00', subtotal: '950.00', priceTier: 'retail' as const, retailPrice: '950.00' };
+    const line = { productId: WIG, quantity: 1, unitPrice: '950.00', subtotal: '950.00', priceTier: 'retail' as const };
     const good = await recordSale(db, { shopId: SHOP, userId: AMA, saleType: 'credit', customerId: local.id, dueDate: '2026-11-08', lines: [line], payment: null });
     const bad = await recordSale(db, { shopId: SHOP, userId: AMA, saleType: 'fullPayment', customerId: null, dueDate: null, lines: [line], payment: { amount: '950.00', method: 'cash', momoReference: null } });
 
@@ -213,11 +218,14 @@ describe('pull', () => {
       db,
       changes({
         shopInventory: [
-          { shopId: SHOP, productId: WIG, quantity: 7, reorderLevel: 1, priceOverride: null, effectivePrice: '980.00', wholesalePriceOverride: null, effectiveWholesalePrice: '800.00', wholesaleMinQuantity: 3, lowStock: false, oversold: false, updatedAt: T },
+          { shopId: SHOP, productId: WIG, quantity: 7, reorderLevel: 1, priceOverride: null, wholesalePriceOverride: '750.00', updatedAt: T },
         ],
       }),
     );
-    const inv = await db.getFirstAsync<{ quantity: number; effectivePrice: string }>('SELECT quantity, effectivePrice FROM shopInventory');
-    expect(inv).toEqual({ quantity: 7, effectivePrice: '980.00' });
+    const inv = await db.getFirstAsync<{ quantity: number }>('SELECT quantity FROM shopInventory');
+    expect(inv).toEqual({ quantity: 7 });
+    // Override cleared → catalog price; the shop's wholesale override applies.
+    const [p] = await listPosProducts(db, SHOP);
+    expect(p).toMatchObject({ retailPrice: '980.00', wholesalePrice: '750.00', wholesaleMinQuantity: 3 });
   });
 });

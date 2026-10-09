@@ -48,9 +48,11 @@ export async function listPosProducts(
   }
   return db.getAllAsync<PosProduct>(
     `SELECT p.id, p.name, p.barcode, p.categoryId, p.coverImageUrl,
-            COALESCE(i.effectivePrice, p.defaultPrice) AS retailPrice,
-            CASE WHEN i.shopId IS NOT NULL THEN i.effectiveWholesalePrice ELSE p.wholesalePrice END AS wholesalePrice,
-            COALESCE(i.wholesaleMinQuantity, p.wholesaleMinQuantity) AS wholesaleMinQuantity,
+            -- Same resolution as the API's effectivePrice / resolveWholesale.
+            COALESCE(i.priceOverride, p.defaultPrice) AS retailPrice,
+            CASE WHEN p.wholesaleMinQuantity IS NULL THEN NULL
+                 ELSE COALESCE(i.wholesalePriceOverride, p.wholesalePrice) END AS wholesalePrice,
+            p.wholesaleMinQuantity AS wholesaleMinQuantity,
             i.quantity AS quantity,
             COALESCE(i.reorderLevel, 0) AS reorderLevel
      FROM products p
