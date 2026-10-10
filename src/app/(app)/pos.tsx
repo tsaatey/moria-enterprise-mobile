@@ -3,7 +3,6 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
-import type { Shop } from '@/api/types';
 import { useSession } from '@/auth/session-store';
 import { PaymentSheet } from '@/components/pos/payment-sheet';
 import { ProductCard } from '@/components/pos/product-card';
@@ -17,6 +16,7 @@ import { listPosCategories, listPosProducts, type PosCategory, type PosProduct }
 import { listActiveShops } from '@/db/shops';
 import { formatGhs } from '@/lib/money';
 import { priceCart, useCart } from '@/pos/cart-store';
+import { useActiveShopId } from '@/shop/active-shop';
 import { useSyncStore } from '@/sync/sync-store';
 import { colors, fonts, radius } from '@/theme/tokens';
 
@@ -26,18 +26,18 @@ const METHOD_LABEL = { cash: 'cash', momo: 'MoMo', credit: 'credit' } as const;
  * `renderPos()`: search, category chips, product grid and the "Current Order"
  * bar. Reads SQLite only, so it works offline.
  *
- * The owner belongs to no shop, and prices and stock are per shop, so the
- * owner picks the selling shop first (the web console does the same). A
- * salesperson always sells from their own shop.
+ * Sells from the working shop: the owner's choice in the side menu (prices
+ * and stock are per shop), or a salesperson's own shop.
  */
 export default function PosScreen() {
   const db = useSQLiteContext();
   const user = useSession((s) => s.user)!;
   const { dataVersion, requestSync } = useSyncStore();
   const pullToSync = usePullToSync();
-  const { shopId, lines, setShop, add, refreshProducts } = useCart();
+  const shopId = useActiveShopId();
+  const { lines, add, refreshProducts } = useCart();
 
-  const [shops, setShops] = useState<Shop[]>([]);
+  const [shopName, setShopName] = useState<string | null>(null);
   const [categories, setCategories] = useState<PosCategory[]>([]);
   const [products, setProducts] = useState<PosProduct[]>([]);
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -50,15 +50,16 @@ export default function PosScreen() {
 
   useFocusEffect(useCallback(() => setFocusTick((t) => t + 1), []));
 
-  // The selling shop.
+  // The selling shop is the owner's working shop, chosen in the side menu
+  // (src/shop/active-shop.ts); a salesperson's is their own.
   useEffect(() => {
-    if (!isOwner) return setShop(user.shopId);
-    void listActiveShops(db).then((rows) => {
-      setShops(rows);
-      const current = useCart.getState().shopId;
-      if (!current || !rows.some((s) => s.id === current)) setShop(rows[0]?.id ?? null);
-    });
-  }, [db, isOwner, user.shopId, setShop, dataVersion]);
+    if (!isOwner || !shopId) return;
+    let live = true;
+    void listActiveShops(db).then((rows) => live && setShopName(rows.find((r) => r.id === shopId)?.name ?? null));
+    return () => {
+      live = false;
+    };
+  }, [db, isOwner, shopId, dataVersion]);
 
   useEffect(() => {
     void listPosCategories(db).then(setCategories);
@@ -90,30 +91,12 @@ export default function PosScreen() {
 
   const header = (
     <View>
-      {isOwner ? (
-        <View style={{ marginBottom: 12 }}>
-          <Text variant="eyebrow" color={colors.onSurfaceVariant} style={{ marginBottom: 8 }}>
-            Selling at
+      {isOwner && shopName ? (
+        <View style={styles.context}>
+          <Icon name="storefront" size={16} color={colors.onSurfaceVariant} />
+          <Text style={styles.contextText} color={colors.onSurfaceVariant}>
+            Selling at <Text style={styles.contextShop} color={colors.regalPlum}>{shopName}</Text>
           </Text>
-          {shops.length ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-              {shops.map((s) => (
-                <Chip
-                  key={s.id}
-                  label={s.name}
-                  selected={s.id === shopId}
-                  onPress={() => {
-                    if (s.id !== shopId && lines.length) showToast('Order cleared — prices are per shop');
-                    setShop(s.id);
-                  }}
-                />
-              ))}
-            </ScrollView>
-          ) : (
-            <Text variant="bodyMd" color={colors.onSurfaceVariant}>
-              No shops on this device yet — sync to load them.
-            </Text>
-          )}
         </View>
       ) : null}
       <View style={styles.search}>
@@ -203,6 +186,9 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontFamily: fonts.sans, fontSize: 14, color: colors.regalPlum, padding: 0 },
   chips: { gap: 8, paddingBottom: 12 },
+  context: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  contextText: { fontFamily: fonts.sans, fontSize: 13 },
+  contextShop: { fontFamily: fonts.sansSemi, fontSize: 13 },
   cartBar: {
     marginHorizontal: 12,
     marginBottom: 4,

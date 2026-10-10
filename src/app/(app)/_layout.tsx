@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
-import { useState } from 'react';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
 import { useSession } from '@/auth/session-store';
@@ -9,6 +10,8 @@ import { SideDrawer } from '@/components/side-drawer';
 import { showToast, ToastHost } from '@/components/ui/toast';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { MAIN_TABS } from '@/navigation/nav-items';
+import { useCart } from '@/pos/cart-store';
+import { useActiveShopId, useActiveShopStore } from '@/shop/active-shop';
 import { useSyncStore } from '@/sync/sync-store';
 import { useAutoSync } from '@/sync/use-auto-sync';
 import { colors, fonts } from '@/theme/tokens';
@@ -31,6 +34,22 @@ export default function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const syncNow = useAutoSync();
   const pending = useSyncStore((s) => s.pending);
+  const dataVersion = useSyncStore((s) => s.dataVersion);
+  const db = useSQLiteContext();
+  const activeShopId = useActiveShopId();
+  const reconcileShop = useActiveShopStore((s) => s.reconcile);
+  const chooseShop = useActiveShopStore((s) => s.choose);
+
+  // The owner's working shop: load the saved choice, and re-check it after
+  // each sync in case that shop was closed.
+  useEffect(() => {
+    if (user?.role === 'owner') void reconcileShop(db);
+  }, [db, user?.role, dataVersion, reconcileShop]);
+
+  // The cart belongs to one shop; moving shops starts a fresh order.
+  useEffect(() => {
+    useCart.getState().setShop(activeShopId);
+  }, [activeShopId]);
 
   if (!user) return null;
   const isOwner = user.role === 'owner';
@@ -84,6 +103,18 @@ export default function AppLayout() {
       <SideDrawer
         open={drawerOpen}
         user={user}
+        activeShopId={activeShopId}
+        dataVersion={dataVersion}
+        onChooseShop={(shopId) => {
+          if (shopId === activeShopId) return;
+          const apply = () => void chooseShop(db, shopId);
+          if (!useCart.getState().lines.length) return apply();
+          // Prices and stock are per shop, so a half-built order cannot follow.
+          Alert.alert('Switch shop?', 'The current order will be cleared.', [
+            { text: 'Keep Shop', style: 'cancel' },
+            { text: 'Switch', style: 'destructive', onPress: apply },
+          ]);
+        }}
         onClose={() => setDrawerOpen(false)}
         onNavigate={(route) => {
           setDrawerOpen(false);

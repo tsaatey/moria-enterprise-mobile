@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-export type MetaKey = 'syncCursor' | 'lastSyncedAt' | 'debtsFetchedAt' | 'dashboardCache';
+export type MetaKey = 'syncCursor' | 'lastSyncedAt' | 'debtsFetchedAt' | 'dashboardCache' | 'activeShopId';
 
 export async function getMeta(db: SQLiteDatabase, key: MetaKey): Promise<string | null> {
   const row = await db.getFirstAsync<{ value: string | null }>('SELECT value FROM meta WHERE key = ?', key);
