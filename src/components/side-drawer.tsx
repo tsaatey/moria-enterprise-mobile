@@ -1,29 +1,55 @@
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useEffect, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { User } from '@/api/types';
+import type { Shop, User } from '@/api/types';
 import { Icon } from '@/components/ui/icon';
 import { Logo } from '@/components/ui/logo';
 import { Text } from '@/components/ui/text';
+import { listActiveShops } from '@/db/shops';
 import { NAV_ITEMS } from '@/navigation/nav-items';
 import { colors, fonts, radius } from '@/theme/tokens';
 
+/**
+ * The side menu. For the owner it is also the one place the working shop is
+ * chosen — Sales and Inventory follow it, and it stays until changed here.
+ */
 export function SideDrawer({
   open,
   user,
+  activeShopId,
+  dataVersion,
+  onChooseShop,
   onClose,
   onNavigate,
   onSignOut,
 }: {
   open: boolean;
   user: User;
+  activeShopId: string | null;
+  dataVersion: number;
+  onChooseShop: (shopId: string) => void;
   onClose: () => void;
   onNavigate: (route: string) => void;
   onSignOut: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const db = useSQLiteContext();
   const isOwner = user.role === 'owner';
-  const shopName = user.shop?.name ?? (isOwner ? 'All shops' : '—');
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [picking, setPicking] = useState(false);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    let live = true;
+    void listActiveShops(db).then((rows) => live && setShops(rows));
+    return () => {
+      live = false;
+    };
+  }, [db, isOwner, dataVersion, open]);
+
+  const shopName = isOwner ? (shops.find((s) => s.id === activeShopId)?.name ?? '—') : (user.shop?.name ?? '—');
 
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
@@ -39,7 +65,48 @@ export function SideDrawer({
               {user.role} · {shopName}
             </Text>
           </View>
-          <View style={{ flex: 1, paddingVertical: 8 }}>
+          {isOwner ? (
+            <View style={styles.shopBox}>
+              <Pressable style={styles.shopRow} onPress={() => setPicking((p) => !p)} accessibilityRole="button">
+                <Icon name="storefront" color={colors.regalPlum} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shopLabel} color={colors.onSurfaceVariant}>
+                    WORKING SHOP
+                  </Text>
+                  <Text style={styles.shopName} color={colors.regalPlum}>
+                    {shopName}
+                  </Text>
+                </View>
+                <Text style={styles.change} color={colors.monarchGold}>
+                  {picking ? 'Done' : 'Change'}
+                </Text>
+              </Pressable>
+              {picking ? (
+                <View style={{ gap: 4, marginTop: 8 }}>
+                  {shops.map((s) => (
+                    <Pressable
+                      key={s.id}
+                      style={[styles.shopOption, s.id === activeShopId && styles.shopOptionOn]}
+                      onPress={() => {
+                        setPicking(false);
+                        onChooseShop(s.id);
+                      }}>
+                      <Text style={styles.shopOptionText} color={colors.regalPlum}>
+                        {s.name}
+                      </Text>
+                      {s.id === activeShopId ? <Icon name="check" size={18} color={colors.successEmerald} /> : null}
+                    </Pressable>
+                  ))}
+                  {!shops.length ? (
+                    <Text style={styles.shopOptionText} color={colors.onSurfaceVariant}>
+                      Sync to load shops.
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 8 }}>
             {NAV_ITEMS.filter((i) => !i.ownerOnly || isOwner).map((item) => (
               <Pressable
                 key={item.route}
@@ -51,7 +118,7 @@ export function SideDrawer({
                 </Text>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
           <Pressable onPress={onSignOut} style={styles.signOut}>
             <Icon name="logout" size={18} />
             <Text style={styles.itemLabel} color={colors.regalPlum}>
@@ -71,6 +138,21 @@ const styles = StyleSheet.create({
   role: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', marginTop: 4 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 24, paddingVertical: 14 },
   itemLabel: { fontFamily: fonts.sansSemi, fontSize: 14 },
+  shopBox: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.lavenderMist },
+  shopRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 8 },
+  shopLabel: { fontFamily: fonts.sansSemi, fontSize: 9, letterSpacing: 1 },
+  shopName: { fontFamily: fonts.sansSemi, fontSize: 14 },
+  change: { fontFamily: fonts.sansSemi, fontSize: 12 },
+  shopOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
+  },
+  shopOptionOn: { backgroundColor: 'rgba(243,232,245,0.6)' },
+  shopOptionText: { fontFamily: fonts.sans, fontSize: 14 },
   signOut: {
     margin: 16,
     paddingVertical: 12,

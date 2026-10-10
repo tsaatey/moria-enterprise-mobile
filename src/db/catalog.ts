@@ -18,10 +18,27 @@ export interface PosCategory {
   name: string;
 }
 
-/** Same rule as the API's inventory list: quantity at or below the reorder level. */
+/**
+ * Same rule as the API's inventory list: quantity at or below the reorder
+ * level. A product with no stock row in this shop has never been stocked
+ * here; the API's low-stock list leaves it out, so it gets no badge.
+ */
 export function stockFlags(p: Pick<PosProduct, 'quantity' | 'reorderLevel'>) {
-  const q = p.quantity ?? 0;
-  return { oversold: q < 0, lowStock: q >= 0 && q <= p.reorderLevel };
+  if (p.quantity === null) return { oversold: false, lowStock: false, stocked: false };
+  return { oversold: p.quantity < 0, lowStock: p.quantity >= 0 && p.quantity <= p.reorderLevel, stocked: true };
+}
+
+export type StockFilter = 'all' | 'low' | 'oversold';
+
+/** The Stock Levels list: every sellable product with this shop's figures, filtered by state. */
+export async function listInventory(
+  db: SQLiteDatabase,
+  shopId: string,
+  { filter = 'all', search }: { filter?: StockFilter; search?: string } = {},
+): Promise<PosProduct[]> {
+  const rows = await listPosProducts(db, shopId, { search });
+  if (filter === 'all') return rows;
+  return rows.filter((p) => (filter === 'low' ? stockFlags(p).lowStock : stockFlags(p).oversold));
 }
 
 /**
