@@ -7,6 +7,7 @@ import type { Shop } from '@/api/types';
 import { useSession } from '@/auth/session-store';
 import { PaymentSheet } from '@/components/pos/payment-sheet';
 import { ProductCard } from '@/components/pos/product-card';
+import { ShopChips } from '@/components/shop-chips';
 import { Chip } from '@/components/ui/chip';
 import { usePullToSync } from '@/components/ui/pull-to-sync';
 import { Icon } from '@/components/ui/icon';
@@ -92,28 +93,15 @@ export default function PosScreen() {
     <View>
       {isOwner ? (
         <View style={{ marginBottom: 12 }}>
-          <Text variant="eyebrow" color={colors.onSurfaceVariant} style={{ marginBottom: 8 }}>
-            Selling at
-          </Text>
-          {shops.length ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-              {shops.map((s) => (
-                <Chip
-                  key={s.id}
-                  label={s.name}
-                  selected={s.id === shopId}
-                  onPress={() => {
-                    if (s.id !== shopId && lines.length) showToast('Order cleared — prices are per shop');
-                    setShop(s.id);
-                  }}
-                />
-              ))}
-            </ScrollView>
-          ) : (
-            <Text variant="bodyMd" color={colors.onSurfaceVariant}>
-              No shops on this device yet — sync to load them.
-            </Text>
-          )}
+          <ShopChips
+            label="Selling at"
+            shops={shops}
+            selected={shopId}
+            onSelect={(id) => {
+              if (id !== shopId && lines.length) showToast('Order cleared — prices are per shop');
+              setShop(id);
+            }}
+          />
         </View>
       ) : null}
       <View style={styles.search}>
