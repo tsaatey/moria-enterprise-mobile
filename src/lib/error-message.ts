@@ -17,5 +17,7 @@ export function errorMessage(e: unknown): string {
         return e.message;
     }
   }
+  // Our own errors carry a sentence meant for the user (e.g. the cover upload).
+  if (e instanceof Error && e.message) return e.message;
   return 'Something went wrong.';
 }
