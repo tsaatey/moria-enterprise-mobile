@@ -4,16 +4,15 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
-import type { Shop } from '@/api/types';
 import { useSession } from '@/auth/session-store';
 import { RestockSheet } from '@/components/inventory/restock-sheet';
-import { ShopChips } from '@/components/shop-chips';
 import { Icon } from '@/components/ui/icon';
 import { usePullToSync } from '@/components/ui/pull-to-sync';
 import { Text } from '@/components/ui/text';
 import { listInventory, type PosProduct, type StockFilter, stockFlags } from '@/db/catalog';
 import { listActiveShops } from '@/db/shops';
 import { formatGhs } from '@/lib/money';
+import { useActiveShopId } from '@/shop/active-shop';
 import { useSyncStore } from '@/sync/sync-store';
 import { colors, fonts, radius } from '@/theme/tokens';
 
@@ -25,8 +24,9 @@ const FILTERS: { id: StockFilter; label: string; color: string }[] = [
 
 /**
  * `renderInventory()` — "Stock Levels". Reads SQLite, so it works offline.
- * The owner picks the shop (stock is per shop) and can restock it; a
- * salesperson sees their own shop, read-only, as § Authorization Matrix has it.
+ * Shows the working shop — the owner's choice in the side menu, or a
+ * salesperson's own (read-only, as § Authorization Matrix has it). The owner
+ * can restock it.
  */
 export default function InventoryScreen() {
   const db = useSQLiteContext();
@@ -35,8 +35,8 @@ export default function InventoryScreen() {
   const { dataVersion, requestSync } = useSyncStore();
   const pullToSync = usePullToSync();
 
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [shopId, setShopId] = useState<string | null>(isOwner ? null : user.shopId);
+  const shopId = useActiveShopId();
+  const [ownerShopName, setOwnerShopName] = useState<string | null>(null);
   const [filter, setFilter] = useState<StockFilter>('all');
   const [rows, setRows] = useState<PosProduct[]>([]);
   const [tick, setTick] = useState(0);
@@ -44,13 +44,15 @@ export default function InventoryScreen() {
 
   useFocusEffect(useCallback(() => setTick((t) => t + 1), []));
 
+  // The owner's working shop is chosen in the side menu; this only names it.
   useEffect(() => {
-    if (!isOwner) return;
-    void listActiveShops(db).then((list) => {
-      setShops(list);
-      setShopId((cur) => (cur && list.some((s) => s.id === cur) ? cur : (list[0]?.id ?? null)));
-    });
-  }, [db, isOwner, dataVersion]);
+    if (!isOwner || !shopId) return;
+    let live = true;
+    void listActiveShops(db).then((list) => live && setOwnerShopName(list.find((s) => s.id === shopId)?.name ?? null));
+    return () => {
+      live = false;
+    };
+  }, [db, isOwner, shopId, dataVersion]);
 
   useEffect(() => {
     if (!shopId) return;
@@ -61,7 +63,7 @@ export default function InventoryScreen() {
     };
   }, [db, shopId, filter, dataVersion, tick]);
 
-  const shopName = isOwner ? (shops.find((s) => s.id === shopId)?.name ?? null) : (user.shop?.name ?? null);
+  const shopName = isOwner ? ownerShopName : (user.shop?.name ?? null);
 
   const header = (
     <View style={{ gap: 16, marginBottom: 4 }}>
@@ -71,7 +73,7 @@ export default function InventoryScreen() {
             Stock Levels
           </Text>
           <Text variant="bodyMd" color={colors.onSurfaceVariant}>
-            {isOwner ? `All shops · ${shopName ?? '—'}` : 'Your shop'}
+            {isOwner ? (shopName ?? '—') : 'Your shop'}
           </Text>
         </View>
         {isOwner ? (
@@ -91,7 +93,6 @@ export default function InventoryScreen() {
           </View>
         ) : null}
       </View>
-      {isOwner ? <ShopChips label="Shop" shops={shops} selected={shopId} onSelect={setShopId} /> : null}
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {FILTERS.map((f) => {
           const on = filter === f.id;
