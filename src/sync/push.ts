@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import * as syncApi from '@/api/sync';
 import type { PushRequest, PushResponse, PushSale } from '@/api/sync';
 import type { Role } from '@/api/types';
+import { writeTransaction } from '@/db/write';
 
 type SyncRow = { syncStatus: string };
 
@@ -194,7 +195,7 @@ export async function applyPushResult(db: SQLiteDatabase, batch: PushRequest, re
     return !r;
   };
 
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await writeTransaction(db, async (txn) => {
     for (const c of batch.customers) await mark(txn, 'customers', 'customer', c.id);
 
     for (const s of batch.sales) {

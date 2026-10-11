@@ -86,3 +86,50 @@ export function listPosCategories(db: SQLiteDatabase): Promise<PosCategory[]> {
     'SELECT id, name FROM categories WHERE isActive = 1 AND deletedAt IS NULL ORDER BY name COLLATE NOCASE',
   );
 }
+
+export interface CatalogProduct {
+  id: string;
+  categoryId: string;
+  categoryName: string | null;
+  name: string;
+  description: string | null;
+  barcode: string | null;
+  defaultPrice: string;
+  costPrice: string | null;
+  wholesalePrice: string | null;
+  wholesaleMinQuantity: number | null;
+  coverImageUrl: string | null;
+  isActive: number;
+  /** Units across every shop. */
+  totalQuantity: number;
+  /** The given shop's reorder level, if it has a stock row. */
+  reorderLevel: number | null;
+}
+
+/**
+ * The owner's catalog, deactivated products included (they can be switched
+ * back on). Deleted rows are left out.
+ */
+export function listCatalogProducts(
+  db: SQLiteDatabase,
+  { search, shopId }: { search?: string; shopId?: string | null } = {},
+): Promise<CatalogProduct[]> {
+  const where = ['p.deletedAt IS NULL'];
+  const params: (string | null)[] = [shopId ?? null];
+  const q = search?.trim();
+  if (q) {
+    where.push(`(p.name LIKE ? ESCAPE '\\' OR p.barcode LIKE ? ESCAPE '\\')`);
+    const like = `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+    params.push(like, like);
+  }
+  return db.getAllAsync<CatalogProduct>(
+    `SELECT p.id, p.categoryId, c.name AS categoryName, p.name, p.description, p.barcode, p.defaultPrice, p.costPrice,
+            p.wholesalePrice, p.wholesaleMinQuantity, p.coverImageUrl, p.isActive,
+            COALESCE((SELECT SUM(i.quantity) FROM shopInventory i WHERE i.productId = p.id), 0) AS totalQuantity,
+            (SELECT i.reorderLevel FROM shopInventory i WHERE i.productId = p.id AND i.shopId = ?) AS reorderLevel
+     FROM products p LEFT JOIN categories c ON c.id = p.categoryId
+     WHERE ${where.join(' AND ')}
+     ORDER BY p.isActive DESC, p.name COLLATE NOCASE`,
+    ...params,
+  );
+}

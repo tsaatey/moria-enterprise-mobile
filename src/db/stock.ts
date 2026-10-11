@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { nowIso } from '@/lib/dates';
 import { newId } from '@/lib/ids';
+import { writeTransaction } from './write';
 
 /**
  * An owner's restock, recorded offline: the movement is queued for
@@ -15,7 +16,7 @@ export async function recordRestock(
 ): Promise<void> {
   if (!Number.isInteger(r.quantity) || r.quantity < 1) throw new Error('A restock adds at least one unit');
   const at = nowIso();
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await writeTransaction(db, async (txn) => {
     await txn.runAsync(
       `INSERT INTO stockMovements (id, shopId, productId, movementType, quantityChange, reason, saleId, deviceRecordedAt, userId, syncStatus)
        VALUES (?, ?, ?, 'restock', ?, ?, NULL, ?, ?, 'pending')`,
