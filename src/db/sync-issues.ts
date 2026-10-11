@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { writeTransaction } from './write';
 
 /** A record the server refused. It stays on the device until corrected and requeued. */
 export interface SyncIssue {
@@ -44,7 +45,7 @@ const TABLE = { sale: 'sales', payment: 'payments', customer: 'customers' } as c
  * customer too, so the completed profile travels in the same push.
  */
 export async function requeue(db: SQLiteDatabase, issue: Pick<SyncIssue, 'type' | 'id' | 'customerId'>): Promise<void> {
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await writeTransaction(db, async (txn) => {
     await txn.runAsync(
       `UPDATE ${TABLE[issue.type]} SET syncStatus = 'pending', syncErrorCode = NULL, syncErrorMessage = NULL WHERE id = ?`,
       issue.id,

@@ -4,6 +4,7 @@ import type { PaymentMethod, PriceTier, SaleType } from '@/api/types';
 import { nowIso } from '@/lib/dates';
 import { newId } from '@/lib/ids';
 import { type Money, sumMoney } from '@/lib/money';
+import { writeTransaction } from './write';
 
 export interface NewSaleLine {
   productId: string;
@@ -37,7 +38,7 @@ export async function recordSale(db: SQLiteDatabase, sale: NewSale): Promise<{ i
   const at = nowIso();
   const totalAmount = sumMoney(sale.lines.map((l) => l.subtotal));
 
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await writeTransaction(db, async (txn) => {
     await txn.runAsync(
       `INSERT INTO sales (id, shopId, userId, customerId, saleType, totalAmount, dueDate, status, note,
          deviceRecordedAt, updatedAt, syncStatus)

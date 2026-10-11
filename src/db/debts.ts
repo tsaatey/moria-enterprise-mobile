@@ -6,6 +6,7 @@ import { newId } from '@/lib/ids';
 import { type Money, money, toMoney } from '@/lib/money';
 
 import { getMeta, setMeta } from './meta';
+import { writeTransaction } from './write';
 
 export interface OpenDebt {
   saleId: string;
@@ -23,7 +24,7 @@ export interface OpenDebt {
 
 /** Replace the cache with a fresh `GET /debts` (the server's `debts` view). */
 export async function saveDebts(db: SQLiteDatabase, debts: Debt[]): Promise<void> {
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await writeTransaction(db, async (txn) => {
     await txn.runAsync('DELETE FROM debtsCache');
     for (const d of debts) {
       await txn.runAsync(

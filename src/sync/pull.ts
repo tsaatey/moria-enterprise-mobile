@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { ChangesResponse } from '@/api/sync';
+import { writeTransaction } from '@/db/write';
 
 const bool = (v: boolean | undefined | null) => (v ? 1 : 0);
 
@@ -13,7 +14,7 @@ const bool = (v: boolean | undefined | null) => (v ? 1 : 0);
  * Rows are kept so past sale lines still resolve; queries filter them out.
  */
 export async function applyChanges(db: SQLiteDatabase, { changes }: ChangesResponse): Promise<void> {
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await writeTransaction(db, async (txn) => {
     for (const c of changes.categories) {
       await txn.runAsync(
         `INSERT INTO categories (id, name, isActive, updatedAt, deletedAt) VALUES (?, ?, ?, ?, ?)

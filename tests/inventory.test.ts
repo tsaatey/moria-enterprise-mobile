@@ -1,5 +1,5 @@
 import { applyChanges } from '@/sync/pull';
-import { listInventory, stockFlags } from '@/db/catalog';
+import { listCatalogProducts, listInventory, stockFlags } from '@/db/catalog';
 import { migrateDbIfNeeded } from '@/db/schema';
 import { recordRestock } from '@/db/stock';
 import { collectPending } from '@/sync/push';
@@ -92,4 +92,19 @@ it('refuses a restock of zero or fewer units', async () => {
   await expect(
     recordRestock(db, { shopId: SHOP, productId: '10000000-0000-4000-8000-000000000001', quantity: 0, reason: null, userId: OWNER }),
   ).rejects.toThrow();
+});
+
+it("lists the owner's catalog with stock across shops, inactive products last", async () => {
+  const db = await seeded();
+  const OTHER = '99999999-9999-4999-8999-999999999999';
+  await db.runAsync(
+    `INSERT INTO shopInventory (shopId, productId, quantity, reorderLevel) VALUES (?, '10000000-0000-4000-8000-000000000001', 7, 2)`,
+    OTHER,
+  );
+  await db.runAsync(`UPDATE products SET isActive = 0 WHERE name = 'Low'`);
+
+  const rows = await listCatalogProducts(db, { shopId: SHOP });
+  expect(rows.map((r) => r.name)).toEqual(['Healthy', 'Never stocked', 'Oversold', 'Low']);
+  expect(rows[0]).toMatchObject({ totalQuantity: 27, reorderLevel: 5, categoryName: 'Wigs' });
+  expect(rows[1]).toMatchObject({ totalQuantity: 0, reorderLevel: null });
 });
