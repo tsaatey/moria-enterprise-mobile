@@ -1,9 +1,10 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { Shop } from '@/api/types';
+import { writeTransaction } from './write';
 
 export async function saveShops(db: SQLiteDatabase, shops: Shop[]): Promise<void> {
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await writeTransaction(db, async (txn) => {
     for (const s of shops) {
       await txn.runAsync(
         `INSERT INTO shops (id, name, location, momoNumber, isActive) VALUES (?, ?, ?, ?, ?)

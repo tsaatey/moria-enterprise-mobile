@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { BUSY_TIMEOUT_MS, writeTransaction } from './write';
 
 /**
  * Local SQLite mirror of the backend tables the device needs offline.
@@ -215,9 +216,11 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {
   if (current === 0) {
     await db.execAsync('PRAGMA journal_mode = WAL;');
   }
+  // Wait for another connection's lock instead of failing (see db/write.ts).
+  await db.execAsync(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
 
   for (let version = current; version < MIGRATIONS.length; version++) {
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await writeTransaction(db, async (txn) => {
       await txn.execAsync(MIGRATIONS[version]);
       // PRAGMA cannot take a bound parameter; version is our own integer.
       await txn.execAsync(`PRAGMA user_version = ${version + 1}`);
